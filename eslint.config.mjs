@@ -13,6 +13,11 @@ const eslintConfig = defineConfig([
     "dist/**",
     "out/**",
     "build/**",
+    // OCR runtimes, dictionaries and model sidecars are vendored build assets,
+    // not application source. Linting their generated glue produced thousands
+    // of unactionable errors and hid regressions in app/ and tests/.
+    "public/**",
+    "work/**",
     "next-env.d.ts",
   ]),
   eslint.configs.recommended,
@@ -23,6 +28,11 @@ const eslintConfig = defineConfig([
   jsxA11y.flatConfigs.recommended,
   next.configs["core-web-vitals"],
   {
+    rules: {
+      // These two images are user-selected blob/data URLs; next/image cannot
+      // optimize them and would break the all-local preview workflow.
+      "@next/next/no-img-element": "off",
+    },
     languageOptions: {
       globals: {
         ...globals.browser,

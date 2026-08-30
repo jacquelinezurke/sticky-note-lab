@@ -1,0 +1,20 @@
+DE·HTR
+Copyright 2026 naeyn
+
+This product includes ONNX Runtime Web, Copyright (c) Microsoft Corporation,
+licensed under the MIT License.
+
+The browser demo includes the Patrick Hand font, Copyright (c) 2010-2012
+Patrick Wagesreiter (mail@patrickwagesreiter.at), licensed under the SIL Open
+Font License, Version 1.1.
+
+The source repository additionally redistributes, outside the browser demo and
+the model release, the unmodified "deu" Tesseract language model
+(data/tessdata/deu.traineddata) from the tessdata_best project, Copyright
+Google Inc. and the tesseract-ocr contributors, licensed under the Apache
+License, Version 2.0. It is an input to the M1 baseline only; nothing derived
+from it is part of the DE·HTR model.
+
+The complete third-party license texts accompany the distributed files. See
+THIRD_PARTY_NOTICES.md in the source and model repositories, data/SOURCES.md for
+the full register, and the linked license files in the browser demo.

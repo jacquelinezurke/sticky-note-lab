@@ -1,0 +1,13 @@
+{
+  "format_version": 2,
+  "model": "model.onnx",
+  "input_name": "image",
+  "output_name": "logits",
+  "input_channels": 1,
+  "image_height": 64,
+  "max_width": 1024,
+  "output_stride": 4,
+  "blank_index": 0,
+  "alphabet": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZäöüÄÖÜß0123456789 .,;:!?\"'()[]{}<>-–—_/\\@#%&*+=|€§°²³→←↑↓×÷",
+  "preprocessing": { "scale": 0.00392156862745098, "pad_value": 1.0 }
+}

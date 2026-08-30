@@ -38,3 +38,27 @@ yarn-error.log*
 /.wrangler/
 /outputs/
 /work/
+
+# local Codex/browser artifacts
+/.codex-remote-attachments/
+
+# generated type/build metadata
+*.tsbuildinfo
+/vite-env.d.ts
+
+# pnpm is the canonical package manager for this repository
+/package-lock.json
+
+# optional starter examples are not part of Post-it Lab
+/examples/
+
+# obsolete local OCR experiments; production uses the pinned versioned paths
+/public/onnx/
+/public/ocr-models/PP-OCRv6_small_rec_onnx_infer.tar
+/public/ocr-models/PP-OCRv6_tiny_det_onnx_infer.tar
+
+# local database files must not enter the repository
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3

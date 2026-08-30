@@ -16,6 +16,28 @@ Sticky Note Lab verwandelt ein Foto eines Haftnotiz-Boards in ein editierbares d
 - Verbindungen zwischen Notizen und Export des Boards
 - keine Übertragung des Board-Fotos an einen Server
 
+## Technisch passiert dabei Folgendes
+
+- Das Foto wird vollständig lokal im Browser dekodiert – es wird nirgendwo hochgeladen.
+- Farben werden im wahrnehmungsnahen Lab-Farbraum gruppiert. Zusätzlich werden Kanten, Rechtecke und sichtbare Papierfragmente untersucht.
+- Bei Überlappungen versucht die Geometrie, verdeckte Ecken zu ergänzen und zu bestimmen, welcher Zettel vorne liegt.
+- Aus den vier erkannten Ecken wird per perspektivischer Transformation ein gerader Ausschnitt berechnet – ähnlich wie bei einem Dokumentenscanner.
+- Von jedem Ausschnitt entstehen mehrere Varianten: Farbe, Graustufen, Schattenausgleich, Kontrastverstärkung, Sauvola-Schwarzweiß und eine „nur Tinte“-Maske.
+- Textzeilen werden einzeln gesucht und zusätzlich als komplette Notiz gelesen.
+- Drei unterschiedliche Leser arbeiten zusammen:
+  - PaddleOCR als Hauptleser
+  - DE·HTR speziell für Handschrift
+  - Tesseract als unabhängiger Fallback
+- Die Ergebnisse werden nicht einfach blind übernommen. Die Anwendung vergleicht vollständige Texte, einzelne Zeilen, Filtervarianten und unabhängige OCR-Engines. Erst danach wird ein Ergebnis ausgewählt.
+- Wörterbücher dürfen nur relativ sichere Tipp- und OCR-Fehler korrigieren, statt beliebige Wörter zu erfinden.
+- Herzen, Pfeile, Smileys und Ausrufezeichen laufen über eine separate Formanalyse, weil normale OCR solche Zeichnungen oft als `11`, `V` oder Buchstaben interpretiert.
+- Am Ende werden Position, Größe, Drehung, Farbe, Ebenenreihenfolge und Text in React-Zustand überführt. Dadurch ist jede Notiz verschiebbar und editierbar.
+- Die sortierte Ansicht berechnet zusätzlich ein kollisionsfreies Raster, ohne die ursprüngliche Fotoanordnung zu zerstören.
+
+Der langsame erste Durchlauf kommt hauptsächlich daher, dass etwa **192 MB lokale OCR-Modelle** geladen, entpackt und für WebAssembly beziehungsweise ONNX vorbereitet werden. Danach laufen die Berechnungen direkt auf deinem Gerät.
+
+Sticky Note Lab kombiniert Computer Vision, mehrere neuronale OCR-Modelle, klassische Bildverarbeitung, geometrische Rekonstruktion und einen grafischen Editor.
+
 ## Voraussetzungen
 
 - Node.js `>=22.13.0`

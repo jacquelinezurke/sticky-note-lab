@@ -601,7 +601,7 @@ function scanOccludedComponent(
     const coverage = covered / Math.max(1, componentMask.pixels.length);
     // A real visible paper lobe should explain a coherent chunk of its colour
     // island. This prevents a sharp but small shadow/tinted-background corner
-    // from outranking the actual note (the dense-overlap fixture's left tail).
+    // from outranking the actual note (for example, a dense overlap's left tail).
     const rank = candidate.score * 0.6 + candidate.visible * 0.2 + Math.min(0.2, coverage * 0.3);
     return { candidate, covered, rank };
     }).sort((left, right) => right.rank - left.rank);
@@ -739,7 +739,7 @@ function suppressDuplicateGeometries(components: NoteGeometry[], baseShortSide: 
 }
 
 /**
- * Recovers partly hidden Post-its from their visible colour islands. A proposal
+ * Recovers partly hidden sticky notes from their visible colour islands. A proposal
  * must be supported by two adjacent physical sides; colour area alone is never
  * enough. That intentionally prefers a missed/flagged note over a giant false
  * rectangle that combines several overlapping papers.

@@ -1,12 +1,12 @@
-# Post-it Lab
+# Sticky Note Lab
 
-Post-it Lab verwandelt ein Foto eines Post-it-Boards in ein editierbares digitales Board. Die Verarbeitung läuft lokal im Browser: Notizen werden erkannt, perspektivisch vermessen, per OCR gelesen und anschließend als verschiebbare Objekte dargestellt.
+Sticky Note Lab verwandelt ein Foto eines Haftnotiz-Boards in ein editierbares digitales Board. Die Verarbeitung läuft lokal im Browser: Notizen werden erkannt, perspektivisch vermessen, per OCR gelesen und anschließend als verschiebbare Objekte dargestellt.
 
-![Post-it Lab](public/og.png)
+![Sticky Note Lab](public/og.png)
 
 ## Funktionen
 
-- farb- und kantenbasierte Erkennung von Post-its
+- farb- und kantenbasierte Erkennung von Haftnotizen
 - Rekonstruktion teilweise überlappter und gedrehter Notizen
 - perspektivisch entzerrte Mehrfach-OCR mit PaddleOCR, DE·HTR und Tesseract
 - Erkennung einfacher Symbole wie Herz, Pfeile, Ausrufezeichen und Smileys
@@ -48,7 +48,7 @@ pnpm test
 pnpm run lint
 ```
 
-Die Tests prüfen unter anderem perspektivische Geometrie, überlappende Notizen, OCR-Fusion, Textkorrektur, Symbolerkennung, Modell-Assets und den Produktions-Build.
+Die Tests prüfen unter anderem perspektivische Geometrie, überlappende Notizen, OCR-Fusion, Textkorrektur, Symbolerkennung, Modell-Assets und den Produktions-Build. Das Repository enthält bewusst keine fremden Board-Fotos; Bildtests verwenden ausschließlich synthetische Testdaten.
 
 ## Projektstruktur
 
@@ -60,6 +60,6 @@ Die Tests prüfen unter anderem perspektivische Geometrie, überlappende Notizen
 
 ## Datenschutz und Lizenzhinweise
 
-Fotos bleiben im Browser und werden nicht hochgeladen. Die mitgelieferten Drittanbieter-Modelle, Wörterbücher und OCR-Runtimes behalten ihre jeweiligen Lizenzen; die zugehörigen Hinweise liegen unter `public/licenses/` und in den jeweiligen Asset-Ordnern.
+Fotos bleiben im Browser und werden nicht hochgeladen. Die mitgelieferten Drittanbieter-Modelle, Wörterbücher und OCR-Runtimes behalten ihre jeweiligen Lizenzen; eine Übersicht mit Quellen, Versionen, Prüfsummen und lokalen Lizenzpfaden steht in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 Dieses Repository enthält derzeit keine allgemeine Open-Source-Lizenz und ist als privates Experiment gedacht.

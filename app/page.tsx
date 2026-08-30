@@ -79,6 +79,8 @@ const DEMO_EDGES: Edge[] = [
 
 const PALETTE = ["#f7dc68", "#f2a3b4", "#a9d9ee", "#b9dfa5", "#cdb8ee", "#f2b46d", "#f6f0df", "#d6d8db"];
 const MIN_RESIZE_SIZE = 4;
+const BOARD_EXPORT_FORMAT = "sticky-note-lab-board";
+const LEGACY_BOARD_EXPORT_FORMAT = "postit-lab-board";
 
 function cloneSnapshot(notes: Note[], edges: Edge[]): Snapshot {
   return { notes: notes.map((note) => ({ ...note })), edges: edges.map((edge) => ({ ...edge })) };
@@ -526,7 +528,7 @@ export default function Home() {
       setSelectedId(detected.notes[0]?.id ?? null);
       if (new URLSearchParams(window.location.search).get("ocrDebug") === "1") {
         const snapshot = { diagnostics: detected.diagnostics ?? null, notes: detected.notes };
-        (window as Window & { __POSTIT_LAB_OCR_DIAGNOSTICS__?: typeof snapshot }).__POSTIT_LAB_OCR_DIAGNOSTICS__ = snapshot;
+        (window as Window & { __STICKY_NOTE_LAB_OCR_DIAGNOSTICS__?: typeof snapshot }).__STICKY_NOTE_LAB_OCR_DIAGNOSTICS__ = snapshot;
         window.dispatchEvent(new CustomEvent("ocr-diagnostics", { detail: snapshot }));
       }
       setToast(detected.notes.length
@@ -552,8 +554,8 @@ export default function Home() {
   };
 
   const exportJson = () => {
-    const payload = { format: "postit-lab-board", version: 3, createdAt: new Date().toISOString(), layoutMode, source: { fileName, photoIncluded: false, aspectRatio: boardAspectRatio }, notes, edges };
-    downloadBlob("postit-lab-board.json", new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const payload = { format: BOARD_EXPORT_FORMAT, version: 4, createdAt: new Date().toISOString(), layoutMode, source: { fileName, photoIncluded: false, aspectRatio: boardAspectRatio }, notes, edges };
+    downloadBlob("sticky-note-lab-board.json", new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
     setToast("Board als JSON exportiert");
   };
 
@@ -564,7 +566,8 @@ export default function Home() {
     reader.onload = () => {
       try {
         const payload = JSON.parse(String(reader.result));
-        if (payload?.format !== "postit-lab-board" || !Array.isArray(payload.notes) || !Array.isArray(payload.edges)) throw new Error("Unbekanntes Format");
+        const supportedFormat = payload?.format === BOARD_EXPORT_FORMAT || payload?.format === LEGACY_BOARD_EXPORT_FORMAT;
+        if (!supportedFormat || !Array.isArray(payload.notes) || !Array.isArray(payload.edges)) throw new Error("Unbekanntes Format");
         pushHistory();
         const importedNotes = payload.notes.map((note: Note, index: number): Note => ({
           ...note,
@@ -582,7 +585,7 @@ export default function Home() {
         setSelectedId(importedNotes[0]?.id ?? null);
         setStatus("Importiertes Board bereit");
         setToast("Board importiert");
-      } catch { setToast("Dieses JSON ist kein gültiges Post-it-Lab-Board"); }
+      } catch { setToast("Dieses JSON ist kein gültiges Sticky-Note-Lab-Board"); }
     };
     reader.readAsText(file);
     event.target.value = "";
@@ -618,7 +621,7 @@ export default function Home() {
       ctx.fillText(line.trim(), -w / 2 + 22, lineY);
       ctx.restore();
     }
-    canvas.toBlob((blob) => { if (blob) downloadBlob("postit-lab-board.png", blob); }, "image/png");
+    canvas.toBlob((blob) => { if (blob) downloadBlob("sticky-note-lab-board.png", blob); }, "image/png");
     setToast("Board als PNG exportiert");
   };
 
@@ -651,7 +654,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><div className="brand-mark"><span /><span /><span /></div><div><h1>Post-it Lab</h1><p>Vom Foto zum editierbaren Board</p></div></div>
+        <div className="brand"><div className="brand-mark"><span /><span /><span /></div><div><h1>Sticky Note Lab</h1><p>Vom Foto zum editierbaren Board</p></div></div>
         <div className="project-name"><span className="status-dot" /><strong>{fileName || "Workshop-Experiment"}</strong><ChevronDown size={15} /></div>
         <div className="header-actions">
           <button className="icon-button" aria-label="Rückgängig" title="Rückgängig" disabled={!history.length} onClick={undo}><Undo2 size={18} /></button>
@@ -669,7 +672,7 @@ export default function Home() {
           </button>
           {imageSrc ? (
             <div className="source-preview">
-              <img src={imageSrc} alt="Hochgeladenes Post-it-Board" />
+              <img src={imageSrc} alt="Hochgeladenes Haftnotiz-Board" />
               <button className="preview-remove" onClick={() => { releaseImageObjectUrl(); setImageSrc(null); setFileName(""); setBoardAspectRatio(1.6); }} aria-label="Foto entfernen"><X size={15} /></button><div className="preview-name"><Check size={15} /> <span>{fileName}</span></div>
             </div>
           ) : <div className="capture-tips"><Sparkles size={17} /><div><strong>Für gute Ergebnisse</strong><p>Gerade fotografieren, Reflexionen vermeiden und möglichst nah ans Board gehen.</p></div></div>}

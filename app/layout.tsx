@@ -13,15 +13,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const socialImage = `${protocol}://${host}/og.png`;
 
   return {
-    title: "Post-it Lab – Board-Fotos digitalisieren",
-    description: "Lokales Experiment: Post-it-Boards aus Fotos erkennen, bearbeiten und verbinden.",
+    title: "Sticky Note Lab – Board-Fotos digitalisieren",
+    description: "Lokales Experiment: Haftnotiz-Boards aus Fotos erkennen, bearbeiten und verbinden.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "Post-it Lab",
+      title: "Sticky Note Lab",
       description: "Vom Foto zum editierbaren Board",
-      images: [{ url: socialImage, width: 1536, height: 896, alt: "Post-it Lab: physisches Board wird zum editierbaren Canvas" }],
+      images: [{ url: socialImage, width: 1536, height: 896, alt: "Sticky Note Lab: physisches Board wird zum editierbaren Canvas" }],
     },
-    twitter: { card: "summary_large_image", title: "Post-it Lab", description: "Vom Foto zum editierbaren Board", images: [socialImage] },
+    twitter: { card: "summary_large_image", title: "Sticky Note Lab", description: "Vom Foto zum editierbaren Board", images: [socialImage] },
   };
 }
 

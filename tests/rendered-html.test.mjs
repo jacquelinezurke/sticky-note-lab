@@ -14,13 +14,13 @@ async function render() {
   );
 }
 
-test("server-renders the Post-it Lab workspace", async () => {
+test("server-renders the Sticky Note Lab workspace", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /Post-it Lab/);
+  assert.match(html, /Sticky Note Lab/);
   assert.match(html, /Vom Foto zum editierbaren Board/);
   assert.match(html, /Foto hier ablegen/);
   assert.match(html, /Verarbeitung lokal im Browser/);
@@ -28,6 +28,14 @@ test("server-renders the Post-it Lab workspace", async () => {
   assert.match(html, /Board-Anordnung/);
   assert.match(html, /Wie im Foto/);
   assert.match(html, /Sortiert/);
+});
+
+test("exports the renamed board format while preserving legacy imports", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /BOARD_EXPORT_FORMAT\s*=\s*"sticky-note-lab-board"/);
+  assert.match(page, /LEGACY_BOARD_EXPORT_FORMAT\s*=\s*"postit-lab-board"/);
+  assert.match(page, /sticky-note-lab-board\.json/);
+  assert.match(page, /sticky-note-lab-board\.png/);
 });
 
 test("keeps detected geometry in the photo coordinate system", async () => {

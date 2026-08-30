@@ -69,8 +69,12 @@ test("builds a browser-safe DEHTR worker URL", async () => {
   assert.match(joined, /\/_next\/static\/dehtr\.worker-/);
 });
 
-test("keeps the real low-resolution board fixture byte-exact", async () => {
-  const fixture = await readFile(new URL("./fixtures/postit-board.jpg", import.meta.url));
-  assert.equal(fixture.length, 30_213);
-  assert.equal(sha256(fixture), "8ECAFFE174E7D595D903CE068730E653164CDCBEC4A624B0BFA6B636BF316345");
+test("documents the licenses and provenance of browser-shipped OCR assets", async () => {
+  const notices = await readFile(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8");
+  assert.match(notices, /@paddleocr\/paddleocr-js/);
+  assert.match(notices, /DE·HTR v2/);
+  assert.match(notices, /dictionary-de/);
+  assert.match(notices, /GPL-2\.0-only OR GPL-3\.0-only/);
+  assert.match(notices, /D218F6FBF0F1C23D2161BD6AC7F5EAA6104FA89955C09290497E31008E2618E4/);
+  assert.match(notices, /B576A0A1281B9BE46B2574028B75575E041B7D7CB650F063886E733467CC1499/);
 });

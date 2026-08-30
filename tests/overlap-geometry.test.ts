@@ -130,7 +130,7 @@ test("keeps differently coloured overlapping notes as separate objects", () => {
   assert.ok(result.some((component) => component.cluster === 2));
 });
 
-test("does not promote a tiny colour fragment to a Post-it", () => {
+test("does not promote a tiny colour fragment to a sticky note", () => {
   const width = 220;
   const height = 150;
   const labels = new Uint8Array(width * height);

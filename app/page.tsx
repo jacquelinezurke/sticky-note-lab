@@ -33,6 +33,7 @@ import {
   type SimpleSymbol,
 } from "./symbol-recognition";
 import type { TextCorrection } from "./text-correction";
+import { PipelineVisualization } from "./pipeline-visualization";
 
 type Note = {
   id: string;
@@ -283,6 +284,7 @@ export default function Home() {
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [future, setFuture] = useState<Snapshot[]>([]);
   const [dragState, setDragState] = useState<DragState>(null);
+  const [showPipeline, setShowPipeline] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -686,6 +688,7 @@ export default function Home() {
             {isAnalyzing && <div className="analysis-meta"><span><i className="activity-dot" aria-hidden="true" />Aktiv seit {formatElapsed(analysisElapsed)}</span><span>Schritt {analysisStep}/5</span></div>}
             {isModelStarting && <p className="model-hint">Erster KI-Start: Das Modell wird einmal geladen und auf diesem Gerät eingerichtet. Tab bitte offen lassen.</p>}
           </div>
+          <button className="secondary-button full pipeline-open-button" onClick={() => setShowPipeline(true)}><ScanLine size={16} /> Scanner-Schritte ansehen</button>
           <div className="layer-section">
             <div className="section-label"><span>EBENEN</span><Plus size={15} /></div>
             <button className="layer-row active" onClick={() => setShowPhoto((value) => !value)}><span className="layer-thumb"><ImagePlus size={15} /></span><span><strong>Originalfoto</strong><small>gesperrter Hintergrund</small></span>{showPhoto ? <Eye size={16} /> : <EyeOff size={16} />}</button>
@@ -755,6 +758,7 @@ export default function Home() {
           <div className="local-card"><div className="local-icon"><Check size={16} /></div><div><strong>Dein Foto bleibt hier</strong><p>Kein Upload, kein Account. Das Experiment läuft auf deinem Gerät.</p></div></div>
         </aside>
       </section>
+      <PipelineVisualization open={showPipeline} onClose={() => setShowPipeline(false)} imageSrc={imageSrc} fileName={fileName} notes={notes} diagnostics={ocrDiagnostics} isAnalyzing={isAnalyzing} analysisProgress={analysisProgress} />
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={isAnalyzing} onChange={onFileInput} /><input ref={importInputRef} type="file" accept="application/json" hidden onChange={importJson} />{toast && <div className="toast"><Check size={16} /> {toast}</div>}
     </main>
   );

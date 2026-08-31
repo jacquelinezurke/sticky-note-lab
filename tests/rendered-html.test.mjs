@@ -28,6 +28,25 @@ test("server-renders the Sticky Note Lab workspace", async () => {
   assert.match(html, /Board-Anordnung/);
   assert.match(html, /Wie im Foto/);
   assert.match(html, /Sortiert/);
+  assert.match(html, /Scanner-Schritte ansehen/);
+});
+
+test("ships an interactive explanation of the complete local scanner pipeline", async () => {
+  const [page, visualization, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/pipeline-visualization.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /<PipelineVisualization/);
+  assert.match(visualization, /Lab-Raum gruppieren/);
+  assert.match(visualization, /Perspektive entzerren/);
+  assert.match(visualization, /Sechs Bildvarianten/);
+  assert.match(visualization, /PaddleOCR/);
+  assert.match(visualization, /DE·HTR/);
+  assert.match(visualization, /Tesseract/);
+  assert.match(visualization, /Evidence Fusion/);
+  assert.match(visualization, /Editierbares Board/);
+  assert.match(css, /@media \(max-width: 560px\)[\s\S]*\.pipeline-dialog/);
 });
 
 test("exports the renamed board format while preserving legacy imports", async () => {

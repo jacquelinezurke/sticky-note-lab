@@ -9,7 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test:unit": "node --experimental-strip-types --test tests/board-layout.test.ts tests/dehtr-model.test.mjs tests/ocr-line-fusion.test.ts tests/ocr-evidence.test.ts tests/ocr-preprocessing.test.ts tests/overlap-geometry.test.ts tests/symbol-recognition.test.ts tests/text-rescue.test.ts",
+    "test:unit": "node --experimental-strip-types --test tests/board-layout.test.ts tests/color-recognition.test.ts tests/dehtr-model.test.mjs tests/ocr-line-fusion.test.ts tests/ocr-evidence.test.ts tests/ocr-preprocessing.test.ts tests/overlap-geometry.test.ts tests/symbol-recognition.test.ts tests/text-rescue.test.ts",
     "test": "tsc --noEmit && pnpm run test:unit && pnpm run build && node --test tests/rendered-html.test.mjs tests/production-assets.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

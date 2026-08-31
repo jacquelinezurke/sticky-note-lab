@@ -14,6 +14,12 @@ import { recognizeNoteTexts, type OcrRunDiagnostics } from "./ocr-engine";
 import { estimateQuadrilateralFromMask, type OcrQuad } from "./ocr-preprocessing";
 import { detectStickyGeometryFromRgba } from "./sticky-detection";
 import {
+  estimateNoteLab,
+  nearestStickyPalette,
+  STICKY_NOTE_PALETTE,
+  type ColorQuad,
+} from "./note-color";
+import {
   createTidyLayout,
   inferOverlapLayerOrder,
   quadToBoardGeometry,
@@ -77,7 +83,7 @@ const DEMO_EDGES: Edge[] = [
   { id: "edge-3", sourceId: "note-4", targetId: "note-5" },
 ];
 
-const PALETTE = ["#f7dc68", "#f2a3b4", "#a9d9ee", "#b9dfa5", "#cdb8ee", "#f2b46d", "#f6f0df", "#d6d8db"];
+const PALETTE = [...STICKY_NOTE_PALETTE];
 const MIN_RESIZE_SIZE = 4;
 const BOARD_EXPORT_FORMAT = "sticky-note-lab-board";
 const LEGACY_BOARD_EXPORT_FORMAT = "postit-lab-board";
@@ -92,29 +98,6 @@ function uid(prefix: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function percentile(values: number[], position: number) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * position)))];
-}
-
-function colorDistance(a: [number, number, number], b: [number, number, number]) {
-  return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
-}
-
-
-function hexToRgb(hex: string): [number, number, number] {
-  const value = hex.replace("#", "");
-  return [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2, 4), 16), parseInt(value.slice(4, 6), 16)];
-}
-
-function nearestPalette(rgb: [number, number, number]) {
-  return PALETTE.reduce((best, color) => {
-    const distance = colorDistance(rgb, hexToRgb(color));
-    return distance < best.distance ? { color, distance } : best;
-  }, { color: PALETTE[0], distance: Number.POSITIVE_INFINITY }).color;
 }
 
 function noteCenter(note: Note) {
@@ -180,28 +163,36 @@ async function detectStickyNotes(
     sampleHeight,
   );
 
+  // Read colour from source-photo crops rather than from the reduced geometry
+  // preview. A reusable canvas keeps peak memory bounded for large phone photos.
+  const colorCanvas = document.createElement("canvas");
+  const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });
+  const estimateSourceColor = (sourceQuad: BoardQuad, seedLab: [number, number, number]) => {
+    if (!colorContext) return nearestStickyPalette(seedLab);
+    const originalQuad = sourceQuad.map((point) => ({
+      x: point.x * image.naturalWidth / width,
+      y: point.y * image.naturalHeight / height,
+    })) as ColorQuad;
+    const minX = clamp(Math.floor(Math.min(...originalQuad.map((point) => point.x))), 0, image.naturalWidth - 1);
+    const minY = clamp(Math.floor(Math.min(...originalQuad.map((point) => point.y))), 0, image.naturalHeight - 1);
+    const maxX = clamp(Math.ceil(Math.max(...originalQuad.map((point) => point.x))), minX + 1, image.naturalWidth);
+    const maxY = clamp(Math.ceil(Math.max(...originalQuad.map((point) => point.y))), minY + 1, image.naturalHeight);
+    const cropWidth = maxX - minX;
+    const cropHeight = maxY - minY;
+    const cropScale = Math.min(1, 720 / Math.max(cropWidth, cropHeight));
+    colorCanvas.width = Math.max(1, Math.round(cropWidth * cropScale));
+    colorCanvas.height = Math.max(1, Math.round(cropHeight * cropScale));
+    colorContext.drawImage(image, minX, minY, cropWidth, cropHeight, 0, 0, colorCanvas.width, colorCanvas.height);
+    const crop = colorContext.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+    const localQuad = originalQuad.map((point) => ({
+      x: (point.x - minX) * cropScale,
+      y: (point.y - minY) * cropScale,
+    })) as ColorQuad;
+    return nearestStickyPalette(estimateNoteLab(crop.data, crop.width, crop.height, localQuad, seedLab));
+  };
+
   report(35, accepted.length ? `${accepted.length} sichere Notizen vermessen` : "Keine sicheren Notizen gefunden");
   const detected = measured.map(({ component, sampleQuad }, index) => {
-    const rawLeft = component.minX * step;
-    const rawTop = component.minY * step;
-    const rawWidth = Math.min(width - rawLeft, (component.maxX - component.minX + 1) * step);
-    const rawHeight = Math.min(height - rawTop, (component.maxY - component.minY + 1) * step);
-    const samples: Array<[number, number, number]> = [];
-    const marginX = Math.max(1, Math.round(rawWidth * 0.18));
-    const marginY = Math.max(1, Math.round(rawHeight * 0.18));
-    const stride = Math.max(1, Math.round(Math.min(rawWidth, rawHeight) / 18));
-    for (let y = rawTop + marginY; y < rawTop + rawHeight - marginY; y += stride) {
-      for (let x = rawLeft + marginX; x < rawLeft + rawWidth - marginX; x += stride) {
-        const sourceIndex = (Math.min(height - 1, y) * width + Math.min(width - 1, x)) * 4;
-        const rgb: [number, number, number] = [data[sourceIndex], data[sourceIndex + 1], data[sourceIndex + 2]];
-        if (Math.max(...rgb) > 70) samples.push(rgb);
-      }
-    }
-    const median: [number, number, number] = [
-      percentile(samples.map((rgb) => rgb[0]), 0.65),
-      percentile(samples.map((rgb) => rgb[1]), 0.65),
-      percentile(samples.map((rgb) => rgb[2]), 0.65),
-    ];
     const sourceQuad = sampleQuad.map((point) => ({
       x: (point.x + 0.5) * step,
       y: (point.y + 0.5) * step,
@@ -216,7 +207,7 @@ async function detectStickyNotes(
       ...placement,
       zIndex: layerOrder[index] + 2,
       origin: "scan",
-      color: nearestPalette(median),
+      color: estimateSourceColor(sourceQuad, geometryDetection.centroids[component.cluster]),
       text: "",
       confidence: 0,
     };

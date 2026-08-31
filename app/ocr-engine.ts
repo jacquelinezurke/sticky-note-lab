@@ -866,13 +866,15 @@ export async function recognizeNoteTexts(
   }
   results = results.map((result) => {
     const symbols = symbolsById.get(result.id) ?? [];
-    if (!symbols.length) return { ...result, symbols };
+    const alternatives = evidenceById.get(result.id) ?? [];
+    if (!symbols.length) return { ...result, alternatives, symbols };
     const mergedText = reconcileRecognizedSymbols(result.text, symbols);
     const mergedRawText = reconcileRecognizedSymbols(result.rawText, symbols);
     const hadText = Boolean(result.text.trim()) && mergedText !== symbols.map((symbol) => symbol.symbol).join(" ");
     const symbolConfidence = Math.round(symbols.reduce((sum, symbol) => sum + symbol.confidence, 0) / symbols.length);
     return {
       ...result,
+      alternatives,
       text: mergedText,
       rawText: mergedRawText,
       confidence: hadText ? result.confidence : symbolConfidence,

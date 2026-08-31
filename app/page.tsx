@@ -32,7 +32,7 @@ import {
   type RecognizedSymbol,
   type SimpleSymbol,
 } from "./symbol-recognition";
-import type { TextCorrection } from "./text-correction";
+import type { OcrEvidence, TextCorrection } from "./text-correction";
 import { PipelineVisualization } from "./pipeline-visualization";
 
 type Note = {
@@ -51,6 +51,7 @@ type Note = {
   rawConfidence?: number;
   corrections?: TextCorrection[];
   symbols?: RecognizedSymbol[];
+  ocrEvidence?: OcrEvidence[];
 };
 
 function formatElapsed(seconds: number) {
@@ -236,6 +237,7 @@ async function detectStickyNotes(
       note.rawConfidence = result?.rawConfidence ?? note.confidence;
       note.corrections = result?.corrections ?? [];
       note.symbols = result?.symbols ?? [];
+      note.ocrEvidence = result?.alternatives ?? [];
     });
   } catch (error) {
     console.warn("OCR nicht verfügbar", error);
@@ -548,7 +550,7 @@ export default function Home() {
 
   const exportJson = () => {
     const payload = { format: BOARD_EXPORT_FORMAT, version: 4, createdAt: new Date().toISOString(), layoutMode, source: { fileName, photoIncluded: false, aspectRatio: boardAspectRatio }, notes, edges };
-    downloadBlob("sticky-note-lab-board.json", new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    downloadBlob("sticky-note-lab-board.json", new Blob([JSON.stringify(payload, (key, value) => key === "ocrEvidence" ? undefined : value, 2)], { type: "application/json" }));
     setToast("Board als JSON exportiert");
   };
 

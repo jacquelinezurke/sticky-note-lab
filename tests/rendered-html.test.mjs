@@ -44,8 +44,14 @@ test("ships an interactive explanation of the complete local scanner pipeline", 
   assert.match(visualization, /PaddleOCR/);
   assert.match(visualization, /DE·HTR/);
   assert.match(visualization, /Tesseract/);
-  assert.match(visualization, /Evidence Fusion/);
+  assert.match(visualization, /EVIDENCE[\s\S]*FUSION/i);
+  assert.match(visualization, /OCR-Labor/);
+  assert.match(visualization, /Konsens-Labor/);
+  assert.match(visualization, /pipeline-vote-metrics/);
+  assert.match(visualization, /candidate\.simulated \? "SIMULATION"/);
   assert.match(visualization, /Editierbares Board/);
+  assert.match(page, /note\.ocrEvidence\s*=\s*result\?\.alternatives/);
+  assert.match(page, /key === "ocrEvidence" \? undefined/);
   assert.match(css, /@media \(max-width: 560px\)[\s\S]*\.pipeline-dialog/);
 });
 

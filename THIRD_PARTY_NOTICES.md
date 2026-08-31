@@ -39,6 +39,7 @@ Direct runtime dependencies used by the application:
 | `lucide-react` | 1.31.0 | ISC |
 | `nspell` | 2.1.5 | MIT |
 | `onnxruntime-web` | 1.27.0 | MIT |
+| `pptxgenjs` | 4.0.1 | MIT |
 | `react`, `react-dom` | 19.2.6 | MIT |
 | `tesseract.js` | 7.0.0 | Apache-2.0 |
 

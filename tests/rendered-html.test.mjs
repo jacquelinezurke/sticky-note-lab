@@ -25,6 +25,7 @@ test("server-renders the Sticky Note Lab workspace", async () => {
   assert.match(html, /Foto hier ablegen/);
   assert.match(html, /Verarbeitung lokal im Browser/);
   assert.match(html, /Board-JSON/);
+  assert.match(html, /PowerPoint \(\.pptx\)/);
   assert.match(html, /Board-Anordnung/);
   assert.match(html, /Wie im Foto/);
   assert.match(html, /Sortiert/);
@@ -61,6 +62,21 @@ test("exports the renamed board format while preserving legacy imports", async (
   assert.match(page, /LEGACY_BOARD_EXPORT_FORMAT\s*=\s*"postit-lab-board"/);
   assert.match(page, /sticky-note-lab-board\.json/);
   assert.match(page, /sticky-note-lab-board\.png/);
+});
+
+test("exports native editable sticky notes to PowerPoint", async () => {
+  const [page, exporter, notices] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/powerpoint-export.ts", import.meta.url), "utf8"),
+    readFile(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /exportBoardToPowerPoint/);
+  assert.match(exporter, /pptx\.ShapeType\.line/);
+  assert.match(exporter, /endArrowType:\s*"triangle"/);
+  assert.match(exporter, /slide\.addText\(note\.text/);
+  assert.match(exporter, /rotate:\s*clamp\(note\.rotation/);
+  assert.match(exporter, /objectName:\s*`Sticky Note/);
+  assert.match(notices, /`pptxgenjs` \| 4\.0\.1 \| MIT/);
 });
 
 test("keeps detected geometry in the photo coordinate system", async () => {

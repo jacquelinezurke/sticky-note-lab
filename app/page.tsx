@@ -3,7 +3,7 @@
 import {
   ArrowRight, Check, ChevronDown, CircleHelp, Download, Eye, EyeOff, FileJson,
   Focus, GripVertical, ImagePlus, Link2, LoaderCircle, Maximize2, MousePointer2,
-  Plus, Redo2, RotateCcw, ScanLine, Sparkles, Trash2, Undo2, Unlink, Upload,
+  Plus, Presentation, Redo2, RotateCcw, ScanLine, Sparkles, Trash2, Undo2, Unlink, Upload,
   WandSparkles, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
@@ -287,6 +287,8 @@ export default function Home() {
   const [future, setFuture] = useState<Snapshot[]>([]);
   const [dragState, setDragState] = useState<DragState>(null);
   const [showPipeline, setShowPipeline] = useState(false);
+  const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -549,9 +551,32 @@ export default function Home() {
   };
 
   const exportJson = () => {
+    setShowExportMenu(false);
     const payload = { format: BOARD_EXPORT_FORMAT, version: 4, createdAt: new Date().toISOString(), layoutMode, source: { fileName, photoIncluded: false, aspectRatio: boardAspectRatio }, notes, edges };
     downloadBlob("sticky-note-lab-board.json", new Blob([JSON.stringify(payload, (key, value) => key === "ocrEvidence" ? undefined : value, 2)], { type: "application/json" }));
     setToast("Board als JSON exportiert");
+  };
+
+  const exportPowerPoint = async () => {
+    if (isExportingPowerPoint) return;
+    setShowExportMenu(false);
+    setIsExportingPowerPoint(true);
+    setToast("PowerPoint wird erstellt …");
+    try {
+      const { exportBoardToPowerPoint } = await import("./powerpoint-export");
+      await exportBoardToPowerPoint({
+        notes: displayNotes,
+        edges,
+        aspectRatio: boardAspectRatio,
+        title: fileName || "Sticky Note Lab Board",
+      });
+      setToast("Bearbeitbare PowerPoint exportiert");
+    } catch (error) {
+      console.error("PowerPoint-Export fehlgeschlagen", error);
+      setToast("PowerPoint konnte nicht erstellt werden");
+    } finally {
+      setIsExportingPowerPoint(false);
+    }
   };
 
   const importJson = (event: ChangeEvent<HTMLInputElement>) => {
@@ -654,7 +679,7 @@ export default function Home() {
         <div className="header-actions">
           <button className="icon-button" aria-label="Rückgängig" title="Rückgängig" disabled={!history.length} onClick={undo}><Undo2 size={18} /></button>
           <button className="icon-button" aria-label="Wiederholen" title="Wiederholen" disabled={!future.length} onClick={redo}><Redo2 size={18} /></button>
-          <div className="export-menu"><button className="primary-button" onClick={exportJson}><Download size={16} /> Exportieren <ChevronDown size={14} /></button><div className="export-popover"><button onClick={exportJson}><FileJson size={16} /> Board-JSON</button><button onClick={exportPng}><ImagePlus size={16} /> PNG-Bild</button><button onClick={() => importInputRef.current?.click()}><Upload size={16} /> JSON importieren</button></div></div>
+          <div className={`export-menu ${showExportMenu ? "open" : ""}`}><button className="primary-button" aria-haspopup="menu" aria-expanded={showExportMenu} onClick={() => setShowExportMenu((value) => !value)}><Download size={16} /> Exportieren <ChevronDown size={14} /></button><div className="export-popover" role="menu"><button role="menuitem" onClick={exportJson}><FileJson size={16} /> Board-JSON</button><button role="menuitem" onClick={() => void exportPowerPoint()} disabled={isExportingPowerPoint}><Presentation size={16} /> {isExportingPowerPoint ? "PowerPoint wird erstellt …" : "PowerPoint (.pptx)"}</button><button role="menuitem" onClick={() => { setShowExportMenu(false); exportPng(); }}><ImagePlus size={16} /> PNG-Bild</button><button role="menuitem" onClick={() => { setShowExportMenu(false); importInputRef.current?.click(); }}><Upload size={16} /> JSON importieren</button></div></div>
           <button className="avatar" aria-label="Lokales Profil">DU</button>
         </div>
       </header>

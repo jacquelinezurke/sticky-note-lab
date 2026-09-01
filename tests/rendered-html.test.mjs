@@ -82,6 +82,8 @@ test("exports native editable sticky notes to PowerPoint", async () => {
     readFile(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8"),
   ]);
   assert.match(page, /exportBoardToPowerPoint/);
+  assert.match(page, /import \{ exportBoardToPowerPoint \} from "\.\/powerpoint-export"/);
+  assert.doesNotMatch(page, /await import\("\.\/powerpoint-export"\)/);
   assert.match(exporter, /pptx\.ShapeType\.line/);
   assert.match(exporter, /endArrowType:\s*"triangle"/);
   assert.match(exporter, /slide\.addText\(note\.text/);

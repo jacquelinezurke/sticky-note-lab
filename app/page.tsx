@@ -34,6 +34,7 @@ import {
 } from "./symbol-recognition";
 import type { OcrEvidence, TextCorrection } from "./text-correction";
 import { PipelineVisualization } from "./pipeline-visualization";
+import { exportBoardToPowerPoint } from "./powerpoint-export";
 
 type Note = {
   id: string;
@@ -565,7 +566,6 @@ export default function Home() {
     setIsExportingPowerPoint(true);
     setToast("PowerPoint wird erstellt …");
     try {
-      const { exportBoardToPowerPoint } = await import("./powerpoint-export");
       await exportBoardToPowerPoint({
         notes: displayNotes,
         edges,

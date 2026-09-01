@@ -212,10 +212,27 @@ test("shows honest OCR activity while model progress is indeterminate", async ()
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(page, /Aktiv seit \{formatElapsed\(analysisElapsed\)\}/);
   assert.match(page, /Erster KI-Start/);
-  assert.match(page, /Schritt \{analysisStep\}\/5/);
+  assert.match(page, /Schritt \{analysisStep\}\/6/);
+  assert.match(page, /Selektiver Fallback/);
+  assert.match(page, /festes Zeitlimit/);
   assert.match(page, /OCR-Original wiederherstellen/);
   assert.match(page, /data-engine-status=\{diagnostic\.status\}/);
   assert.match(page, /Texterkennung eingeschränkt/);
+});
+
+test("bounds the slow Tesseract fallback and keeps it visibly active", async () => {
+  const engine = await readFile(new URL("../app/ocr-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /TESSERACT_INIT_TIMEOUT_MS\s*=\s*28_000/);
+  assert.match(engine, /TESSERACT_PASS_TIMEOUT_MS\s*=\s*16_000/);
+  assert.match(engine, /TESSERACT_MOBILE_BUDGET_MS\s*=\s*34_000/);
+  assert.match(engine, /const maximumNotes = constrainedDevice \? 3 : 5/);
+  assert.match(engine, /withOcrDeadline\(workerPromise/);
+  assert.match(engine, /const needsSecondPass =/);
+  assert.match(engine, /if \(needsSecondPass && secondPassBudget >= 2500\)/);
+  assert.match(engine, /Fallback wird für \$\{fallbackNotes\.length\}/);
+  assert.match(engine, /window\.setInterval/);
+  assert.match(engine, /skippedCount/);
+  assert.doesNotMatch(engine, /blocks:\s*true/);
 });
 
 test("recognizes simple symbols outside word OCR and keeps them editable", async () => {

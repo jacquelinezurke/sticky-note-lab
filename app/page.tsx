@@ -328,8 +328,9 @@ export default function Home() {
   const maximumDisplayLayer = Math.max(2, ...displayNotes.map((note, index) => note.zIndex ?? index + 2));
   const confidenceAverage = notes.length ? Math.round(notes.reduce((sum, note) => sum + note.confidence, 0) / notes.length) : 0;
   const lowConfidenceCount = notes.filter((note) => note.confidence < 70).length;
-  const analysisStep = analysisProgress < 10 ? 1 : analysisProgress < 35 ? 2 : analysisProgress < 41 ? 3 : analysisProgress < 99 ? 4 : 5;
+  const analysisStep = analysisProgress < 10 ? 1 : analysisProgress < 35 ? 2 : analysisProgress < 41 ? 3 : analysisProgress < 85 ? 4 : analysisProgress < 95 ? 5 : 6;
   const isModelStarting = isAnalyzing && analysisProgress === 41;
+  const isFallbackRunning = isAnalyzing && analysisProgress >= 95 && analysisProgress < 99;
 
   const pushHistory = useCallback(() => {
     setHistory((current) => [...current.slice(-39), cloneSnapshot(notesRef.current, edgesRef.current)]);
@@ -737,8 +738,9 @@ export default function Home() {
                 </span>
               ))}
             </div>}
-            {isAnalyzing && <div className="analysis-meta"><span><i className="activity-dot" aria-hidden="true" />Aktiv seit {formatElapsed(analysisElapsed)}</span><span>Schritt {analysisStep}/5</span></div>}
+            {isAnalyzing && <div className="analysis-meta"><span><i className="activity-dot" aria-hidden="true" />Aktiv seit {formatElapsed(analysisElapsed)}</span><span>Schritt {analysisStep}/6</span></div>}
             {isModelStarting && <p className="model-hint">Erster KI-Start: Das Modell wird einmal geladen und auf diesem Gerät eingerichtet. Tab bitte offen lassen.</p>}
+            {isFallbackRunning && <p className="model-hint fallback-hint">Selektiver Fallback: Nur die schwierigsten Notizen werden noch gegengeprüft. Dieser Schritt besitzt jetzt ein festes Zeitlimit.</p>}
           </div>
           <button className="secondary-button full pipeline-open-button" onClick={() => setShowPipeline(true)}><ScanLine size={16} /> Scanner-Schritte ansehen</button>
           <div className="layer-section">
@@ -770,7 +772,7 @@ export default function Home() {
                   {selectedId === note.id && tool === "select" && layoutMode === "original" && <button className="resize-handle" aria-label="Notizgröße ändern" onPointerDown={(event) => startPointerAction(event, note, "resize")} onPointerMove={movePointerAction} onPointerUp={() => setDragState(null)}><Maximize2 size={12} /></button>}
                 </div>
               ))}
-              {isAnalyzing && <div className="analysis-overlay" aria-hidden="true"><div className="scanner-line" /><div className="analysis-modal"><WandSparkles size={24} /><span className="analysis-modal-copy"><strong>{status}</strong><small><i className="activity-dot" />Aktiv · {formatElapsed(analysisElapsed)} · Schritt {analysisStep}/5</small></span><span>{analysisProgress}%</span></div></div>}
+              {isAnalyzing && <div className="analysis-overlay" aria-hidden="true"><div className="scanner-line" /><div className="analysis-modal"><WandSparkles size={24} /><span className="analysis-modal-copy"><strong>{status}</strong><small><i className="activity-dot" />Aktiv · {formatElapsed(analysisElapsed)} · Schritt {analysisStep}/6</small></span><span>{analysisProgress}%</span></div></div>}
             </div>
             <div className="zoom-control"><button onClick={() => setZoom((value) => clamp(value - 10, 60, 150))}><ZoomOut size={16} /></button><button className="zoom-value" onClick={() => setZoom(100)}>{zoom}%</button><button onClick={() => setZoom((value) => clamp(value + 10, 60, 150))}><ZoomIn size={16} /></button></div>
             <div className="privacy-pill"><span /> Verarbeitung lokal im Browser</div>

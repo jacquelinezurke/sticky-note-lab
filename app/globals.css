@@ -102,6 +102,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .activity-dot { display: inline-block; width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: #64ad70; box-shadow: 0 0 0 0 rgba(100,173,112,.45); animation: activity-pulse 1.4s ease-out infinite; }
 @keyframes activity-pulse { 70% { box-shadow: 0 0 0 6px rgba(100,173,112,0); } 100% { box-shadow: 0 0 0 0 rgba(100,173,112,0); } }
 .analysis-card .model-hint { margin-top: 8px; padding: 7px 8px; border-radius: 7px; background: #fff7df; color: #66551c; }
+.analysis-card .fallback-hint { background: #eef4ff; color: #38557f; }
 .pipeline-open-button { margin-top: 9px; }
 .layer-section { margin: 20px 0 14px; border-top: 1px solid #e2dfd6; padding-top: 14px; }
 .section-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

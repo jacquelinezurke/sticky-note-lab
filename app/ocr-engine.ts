@@ -79,7 +79,20 @@ type PaddleRunner = {
 };
 
 const PADDLE_INIT_TIMEOUT_MS = 120_000;
+const TESSERACT_INIT_TIMEOUT_MS = 28_000;
+const TESSERACT_PASS_TIMEOUT_MS = 16_000;
+const TESSERACT_DESKTOP_BUDGET_MS = 52_000;
+const TESSERACT_MOBILE_BUDGET_MS = 34_000;
 let paddleRunnerPromise: Promise<PaddleRunner> | null = null;
+
+class OcrDeadlineError extends Error {}
+
+function withOcrDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new OcrDeadlineError(message)), Math.max(1, timeoutMs));
+    promise.then((value) => { window.clearTimeout(timer); resolve(value); }, (error) => { window.clearTimeout(timer); reject(error); });
+  });
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -636,34 +649,68 @@ async function recognizeWithTesseract(
   recordSymbols: (id: string, crops: ReturnType<typeof prepareNoteCrops>) => void,
 ) {
   const startedAt = performance.now();
-  const fallbackNotes = notes;
-  if (!fallbackNotes.length) return { attempts: 0, candidateCount: 0, elapsedMs: 0 };
+  const deviceMemory = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8);
+  const constrainedDevice = (navigator.hardwareConcurrency || 8) <= 4 || deviceMemory <= 4;
+  const maximumNotes = constrainedDevice ? 3 : 5;
+  const fallbackNotes = notes.slice(0, maximumNotes);
+  let skippedCount = Math.max(0, notes.length - fallbackNotes.length);
+  if (!fallbackNotes.length) return { attempts: 0, candidateCount: 0, failureCount: 0, skippedCount, elapsedMs: 0 };
 
   const isKnownWord = await getOcrWordChecker().catch(() => () => false);
-  report(95, "Letzte lokale Ersatzlesung wird geladen");
+  report(95, `Fallback wird für ${fallbackNotes.length} besonders schwierige Notiz${fallbackNotes.length === 1 ? "" : "en"} vorbereitet`);
   const { createWorker, OEM, PSM } = await import("tesseract.js");
   let active = 0;
   let activePass = 0;
+  let attempts = 0;
   let candidateCount = 0;
   let failureCount = 0;
   let firstFailure: Error | null = null;
-  const worker = await createWorker(["deu", "eng"], OEM.LSTM_ONLY, {
+  const totalBudgetMs = constrainedDevice ? TESSERACT_MOBILE_BUDGET_MS : TESSERACT_DESKTOP_BUDGET_MS;
+  const initStartedAt = performance.now();
+  const initHeartbeat = window.setInterval(() => {
+    report(95, `Lokaler Fallback wird geladen · ${Math.round((performance.now() - initStartedAt) / 1000)} s`);
+  }, 1000);
+  const workerPromise = createWorker(["deu", "eng"], OEM.LSTM_ONLY, {
     workerPath: "/tesseract/worker.min.js",
     corePath: "/tesseract-core/",
     langPath: "/tessdata",
     logger: (message) => {
       if (message.status === "recognizing text") {
         const progress = 95 + ((active + (activePass + message.progress) / 2) / Math.max(1, fallbackNotes.length)) * 3;
-        report(Math.min(98, Math.round(progress)), `Gegenprüfung ${active + 1} von ${fallbackNotes.length}`);
+        report(Math.min(98, Math.round(progress)), `Fallback ${active + 1}/${fallbackNotes.length} · Lesung ${activePass + 1}`);
+      } else if (typeof message.status === "string") {
+        const phases: Record<string, string> = {
+          "loading tesseract core": "OCR-Kern wird geladen",
+          "initializing tesseract": "OCR-Kern wird initialisiert",
+          "loading language traineddata": "Sprachmodelle werden geladen",
+          "initializing api": "Sprachmodelle werden vorbereitet",
+        };
+        report(95, phases[message.status] ?? "Lokaler Fallback wird vorbereitet");
       }
     },
   });
+  let worker: Awaited<typeof workerPromise>;
+  try {
+    worker = await withOcrDeadline(workerPromise, TESSERACT_INIT_TIMEOUT_MS, "Der Tesseract-Fallback konnte nicht rechtzeitig geladen werden.");
+  } catch (error) {
+    void workerPromise.then((lateWorker) => lateWorker.terminate()).catch(() => undefined);
+    throw error;
+  } finally {
+    window.clearInterval(initHeartbeat);
+  }
 
   try {
     for (active = 0; active < fallbackNotes.length; active += 1) {
+      const remainingBudget = totalBudgetMs - (performance.now() - startedAt);
+      if (remainingBudget < 2500) {
+        skippedCount += fallbackNotes.length - active;
+        firstFailure ??= new OcrDeadlineError("Der Fallback wurde nach seinem Zeitbudget beendet.");
+        break;
+      }
       const note = fallbackNotes[active];
       let prepared: ReturnType<typeof prepareNoteCrops> | null = null;
       try {
+        attempts += 1;
         prepared = prepareNoteCrops(image, note);
         recordSymbols(note.id, prepared);
         activePass = 0;
@@ -673,13 +720,23 @@ async function recognizeWithTesseract(
           user_defined_dpi: "300",
           tessedit_do_invert: "0",
         });
-        const first = await worker.recognize(prepared.contrast, {}, { text: true, blocks: true });
+        const first = await withOcrDeadline(
+          worker.recognize(prepared.contrast, {}, { text: true }),
+          Math.min(TESSERACT_PASS_TIMEOUT_MS, Math.max(1000, remainingBudget - 1500)),
+          `Die Gegenprüfung für ${note.id} hat zu lange gebraucht.`,
+        );
         let best: OcrCandidate | null = cleanText(first.data.text)
           ? { text: cleanText(first.data.text), confidence: Math.round(first.data.confidence || 0), engine: "tesseract", variant: "tesseract-block-contrast", scope: "note" }
           : null;
         recordEvidence(note.id, best);
 
-        {
+        const current = existing.get(note.id) ?? null;
+        const firstBands = detectTextLineBands(prepared.sauvola);
+        const firstContext = visualContextFromBands(firstBands);
+        const needsSecondPass = !best || best.confidence < 62 || assessOcrText(best, { isKnown: isKnownWord }, firstContext) < 0.62
+          || Boolean(current && similarity(current.text, best.text) < 0.48);
+        const secondPassBudget = totalBudgetMs - (performance.now() - startedAt);
+        if (needsSecondPass && secondPassBudget >= 2500) {
           activePass = 1;
           await worker.setParameters({
             tessedit_pageseg_mode: PSM.SPARSE_TEXT,
@@ -687,7 +744,11 @@ async function recognizeWithTesseract(
             user_defined_dpi: "300",
             tessedit_do_invert: "0",
           });
-          const second = await worker.recognize(prepared.sauvola, {}, { text: true, blocks: true });
+          const second = await withOcrDeadline(
+            worker.recognize(prepared.sauvola, {}, { text: true }),
+            Math.min(TESSERACT_PASS_TIMEOUT_MS, Math.max(1000, secondPassBudget - 1000)),
+            `Die zweite Gegenprüfung für ${note.id} hat zu lange gebraucht.`,
+          );
           const alternative: OcrCandidate | null = cleanText(second.data.text)
             ? { text: cleanText(second.data.text), confidence: Math.round(second.data.confidence || 0), engine: "tesseract", variant: "tesseract-sparse-sauvola", scope: "note" }
             : null;
@@ -699,7 +760,6 @@ async function recognizeWithTesseract(
             visualContextFromBands(bands),
           );
         }
-        const current = existing.get(note.id) ?? null;
         if (!best) {
           if (current) existing.set(note.id, current);
           continue;
@@ -724,6 +784,10 @@ async function recognizeWithTesseract(
         failureCount += 1;
         firstFailure ??= error instanceof Error ? error : new Error(String(error));
         console.warn(`OCR-Gegenprüfung für ${note.id} fehlgeschlagen`, error);
+        if (error instanceof OcrDeadlineError) {
+          skippedCount += fallbackNotes.length - active - 1;
+          break;
+        }
       } finally {
         if (prepared) disposePreparedNoteCrops(prepared);
       }
@@ -732,9 +796,10 @@ async function recognizeWithTesseract(
     await worker.terminate();
   }
   return {
-    attempts: fallbackNotes.length,
+    attempts,
     candidateCount,
     failureCount,
+    skippedCount,
     elapsedMs: performance.now() - startedAt,
     error: firstFailure?.message,
   };
@@ -817,15 +882,21 @@ export async function recognizeNoteTexts(
   }
 
   const fallbackIsKnown = await getOcrWordChecker().catch(() => () => false);
+  const fallbackUrgency = (note: NoteRegion) => {
+    const candidate = candidates.get(note.id);
+    if (!candidate?.text.trim()) return 10_000;
+    return (100 - candidate.confidence) * 2 + Math.max(0, 60 - textQuality(candidate)) * 1.5
+      + Math.max(0, 0.65 - lexicalPlausibility(candidate, fallbackIsKnown)) * 100;
+  };
   const tesseractNotes = notes.filter((note) => {
     const candidate = candidates.get(note.id);
     return !candidate || !candidate.text.trim() || candidate.confidence < 70 || textQuality(candidate) < 45
       || lexicalPlausibility(candidate, fallbackIsKnown) < 0.5;
-  });
+  }).sort((left, right) => fallbackUrgency(right) - fallbackUrgency(left));
   if (tesseractNotes.length) {
     try {
       const tesseract = await recognizeWithTesseract(image, tesseractNotes, candidates, report, recordEvidence, recordSymbols);
-      diagnostics.tesseract = { status: tesseract.failureCount ? "partial" : "ready", ...tesseract };
+      diagnostics.tesseract = { status: tesseract.failureCount || tesseract.skippedCount ? "partial" : "ready", ...tesseract };
     } catch (error) {
       diagnostics.tesseract = {
         status: "failed",

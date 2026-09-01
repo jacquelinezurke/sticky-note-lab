@@ -52,6 +52,15 @@ test("ships an interactive explanation of the complete local scanner pipeline", 
   assert.match(visualization, /Konsens-Labor/);
   assert.match(visualization, /pipeline-vote-metrics/);
   assert.match(visualization, /candidate\.simulated \? "SIMULATION"/);
+  assert.match(visualization, /Erkannte Farbgruppen im CIELAB-Farbraum/);
+  assert.match(visualization, /Zuordnung zur Zielpalette/);
+  assert.match(visualization, /Varianten-Matrix/);
+  assert.match(visualization, /Kandidaten-Graph/);
+  assert.match(visualization, /Modellkonfidenz \(%\)/);
+  assert.match(visualization, /Tesseract startet bei: kein Text/);
+  assert.match(visualization, /Fallback-Graph/);
+  assert.match(css, /@keyframes flow-dash/);
+  assert.match(css, /@keyframes evidence-pop/);
   assert.match(visualization, /Editierbares Board/);
   assert.match(page, /note\.ocrEvidence\s*=\s*result\?\.alternatives/);
   assert.match(page, /key === "ocrEvidence" \? undefined/);

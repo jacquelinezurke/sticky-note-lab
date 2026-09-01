@@ -14,6 +14,7 @@ Sticky Note Lab verwandelt ein Foto eines Haftnotiz-Boards in ein editierbares d
 - Ansicht **Wie im Foto** mit Drehung und Überlappung
 - Ansicht **Sortiert** mit geraden, kollisionsfreien Notizen
 - Verbindungen zwischen Notizen und Export als JSON, PNG, bearbeitbare PowerPoint (`.pptx`), Excel (`.xlsx`) oder CSV
+- interaktive Scanner-Erklärung mit Lab-Farbdiagramm, OCR-Variantenmatrix, Kandidatenplot, Konsens- und Fallback-Graph
 - keine Übertragung des Board-Fotos an einen Server
 
 ## Exportformate

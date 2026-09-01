@@ -2,7 +2,7 @@
 
 import {
   ArrowRight, Check, ChevronDown, CircleHelp, Download, Eye, EyeOff, FileJson,
-  Focus, GripVertical, ImagePlus, Link2, LoaderCircle, Maximize2, MousePointer2,
+  FileSpreadsheet, Focus, GripVertical, ImagePlus, Link2, LoaderCircle, Maximize2, MousePointer2,
   Plus, Presentation, Redo2, RotateCcw, ScanLine, Sparkles, Trash2, Undo2, Unlink, Upload,
   WandSparkles, X, ZoomIn, ZoomOut,
 } from "lucide-react";
@@ -288,6 +288,7 @@ export default function Home() {
   const [dragState, setDragState] = useState<DragState>(null);
   const [showPipeline, setShowPipeline] = useState(false);
   const [isExportingPowerPoint, setIsExportingPowerPoint] = useState(false);
+  const [isExportingSpreadsheet, setIsExportingSpreadsheet] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -579,6 +580,30 @@ export default function Home() {
     }
   };
 
+  const exportSpreadsheet = async (format: "xlsx" | "csv") => {
+    if (isExportingSpreadsheet) return;
+    setShowExportMenu(false);
+    setIsExportingSpreadsheet(true);
+    setToast(format === "xlsx" ? "Excel-Datei wird erstellt …" : "CSV-Datei wird erstellt …");
+    try {
+      const { createBoardCsv, createBoardExcelBlob } = await import("./spreadsheet-export");
+      if (format === "xlsx") {
+        const blob = await createBoardExcelBlob(displayNotes, fileName || "Sticky Note Lab Board");
+        downloadBlob("sticky-note-lab-post-its.xlsx", blob);
+        setToast("Post-it-Daten als Excel exportiert");
+      } else {
+        const csv = createBoardCsv(displayNotes);
+        downloadBlob("sticky-note-lab-post-its.csv", new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        setToast("Post-it-Daten als CSV exportiert");
+      }
+    } catch (error) {
+      console.error("Tabellenexport fehlgeschlagen", error);
+      setToast("Tabelle konnte nicht erstellt werden");
+    } finally {
+      setIsExportingSpreadsheet(false);
+    }
+  };
+
   const importJson = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -679,7 +704,7 @@ export default function Home() {
         <div className="header-actions">
           <button className="icon-button" aria-label="Rückgängig" title="Rückgängig" disabled={!history.length} onClick={undo}><Undo2 size={18} /></button>
           <button className="icon-button" aria-label="Wiederholen" title="Wiederholen" disabled={!future.length} onClick={redo}><Redo2 size={18} /></button>
-          <div className={`export-menu ${showExportMenu ? "open" : ""}`}><button className="primary-button" aria-haspopup="menu" aria-expanded={showExportMenu} onClick={() => setShowExportMenu((value) => !value)}><Download size={16} /> Exportieren <ChevronDown size={14} /></button><div className="export-popover" role="menu"><button role="menuitem" onClick={exportJson}><FileJson size={16} /> Board-JSON</button><button role="menuitem" onClick={() => void exportPowerPoint()} disabled={isExportingPowerPoint}><Presentation size={16} /> {isExportingPowerPoint ? "PowerPoint wird erstellt …" : "PowerPoint (.pptx)"}</button><button role="menuitem" onClick={() => { setShowExportMenu(false); exportPng(); }}><ImagePlus size={16} /> PNG-Bild</button><button role="menuitem" onClick={() => { setShowExportMenu(false); importInputRef.current?.click(); }}><Upload size={16} /> JSON importieren</button></div></div>
+          <div className={`export-menu ${showExportMenu ? "open" : ""}`}><button className="primary-button" aria-haspopup="menu" aria-expanded={showExportMenu} onClick={() => setShowExportMenu((value) => !value)}><Download size={16} /> Exportieren <ChevronDown size={14} /></button><div className="export-popover" role="menu"><button role="menuitem" onClick={exportJson}><FileJson size={16} /> Board-JSON</button><button role="menuitem" onClick={() => void exportPowerPoint()} disabled={isExportingPowerPoint}><Presentation size={16} /> {isExportingPowerPoint ? "PowerPoint wird erstellt …" : "PowerPoint (.pptx)"}</button><button role="menuitem" onClick={() => void exportSpreadsheet("xlsx")} disabled={isExportingSpreadsheet}><FileSpreadsheet size={16} /> {isExportingSpreadsheet ? "Tabelle wird erstellt …" : "Excel (.xlsx)"}</button><button role="menuitem" onClick={() => void exportSpreadsheet("csv")} disabled={isExportingSpreadsheet}><FileSpreadsheet size={16} /> CSV-Tabelle</button><button role="menuitem" onClick={() => { setShowExportMenu(false); exportPng(); }}><ImagePlus size={16} /> PNG-Bild</button><button role="menuitem" onClick={() => { setShowExportMenu(false); importInputRef.current?.click(); }}><Upload size={16} /> JSON importieren</button></div></div>
           <button className="avatar" aria-label="Lokales Profil">DU</button>
         </div>
       </header>

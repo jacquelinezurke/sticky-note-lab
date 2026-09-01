@@ -36,6 +36,7 @@ Direct runtime dependencies used by the application:
 | Package | Version | License |
 | --- | --- | --- |
 | `drizzle-orm` | 0.45.2 | Apache-2.0 |
+| `exceljs` | 4.4.0 | MIT |
 | `lucide-react` | 1.31.0 | ISC |
 | `nspell` | 2.1.5 | MIT |
 | `onnxruntime-web` | 1.27.0 | MIT |

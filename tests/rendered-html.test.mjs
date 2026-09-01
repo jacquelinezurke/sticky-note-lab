@@ -26,6 +26,8 @@ test("server-renders the Sticky Note Lab workspace", async () => {
   assert.match(html, /Verarbeitung lokal im Browser/);
   assert.match(html, /Board-JSON/);
   assert.match(html, /PowerPoint \(\.pptx\)/);
+  assert.match(html, /Excel \(\.xlsx\)/);
+  assert.match(html, /CSV-Tabelle/);
   assert.match(html, /Board-Anordnung/);
   assert.match(html, /Wie im Foto/);
   assert.match(html, /Sortiert/);
@@ -77,6 +79,22 @@ test("exports native editable sticky notes to PowerPoint", async () => {
   assert.match(exporter, /rotate:\s*clamp\(note\.rotation/);
   assert.match(exporter, /objectName:\s*`Sticky Note/);
   assert.match(notices, /`pptxgenjs` \| 4\.0\.1 \| MIT/);
+});
+
+test("exports structured Post-it rows to Excel and CSV", async () => {
+  const [page, exporter, readme, notices] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/spreadsheet-export.ts", import.meta.url), "utf8"),
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /createBoardExcelBlob/);
+  assert.match(page, /createBoardCsv/);
+  assert.match(exporter, /Post-it-Nr\./);
+  assert.match(exporter, /Reihe\/Zeile/);
+  assert.match(exporter, /Farbcode \(HEX\)/);
+  assert.match(readme, /Excel \(`\.xlsx`\) oder CSV/);
+  assert.match(notices, /`exceljs` \| 4\.4\.0 \| MIT/);
 });
 
 test("keeps detected geometry in the photo coordinate system", async () => {

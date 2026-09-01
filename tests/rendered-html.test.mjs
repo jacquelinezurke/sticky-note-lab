@@ -235,6 +235,29 @@ test("bounds the slow Tesseract fallback and keeps it visibly active", async () 
   assert.doesNotMatch(engine, /blocks:\s*true/);
 });
 
+test("overlaps independent OCR readers only on capable devices without dropping evidence", async () => {
+  const [engine, dehtr] = await Promise.all([
+    readFile(new URL("../app/ocr-engine.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/dehtr-engine.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(engine, /function supportsParallelOcrReaders\(\)/);
+  assert.match(engine, /deviceMemory >= 6 && navigator\.hardwareConcurrency >= 6/);
+  assert.match(engine, /Promise\.all\(\[getPaddleRunner\(report\), wordCheckerPromise\]\)/);
+  assert.match(engine, /onBatchComplete\?\.\(batch/);
+  assert.match(engine, /scheduleDehtr\(completedNotes\)/);
+  assert.match(engine, /dehtrTail\.then/);
+  assert.match(engine, /Parallel · \$\{label\}/);
+  assert.match(engine, /textBandsById/);
+  assert.match(engine, /if \(!parallelReaders \|\| !candidates\.has\(id\)\) candidates\.set/);
+  assert.match(dehtr, /export function preloadDehtrModel\(\)/);
+  for (const variant of ["rgb", "contrast", "gray", "sauvola", "ink"]) {
+    assert.match(engine, new RegExp(`readVariant\\("${variant}"`));
+  }
+  assert.match(engine, /recognizeWithPaddle/);
+  assert.match(engine, /recognizeWithDehtr/);
+  assert.match(engine, /recognizeWithTesseract/);
+});
+
 test("recognizes simple symbols outside word OCR and keeps them editable", async () => {
   const [page, engine, symbols, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),

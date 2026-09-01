@@ -1,6 +1,6 @@
 "use client";
 
-import { recognizeHandwrittenLine } from "./dehtr-engine";
+import { preloadDehtrModel, recognizeHandwrittenLine } from "./dehtr-engine";
 import { assessOcrText, fuseOcrLines as fuseCompleteOcrLines, ocrTextSimilarity, type FusionContext } from "./ocr-fusion";
 import { mergeOcrEvidence } from "./ocr-evidence";
 import {
@@ -19,6 +19,8 @@ import { correctOcrTexts, getOcrWordChecker, type OcrEvidence, type TextCorrecti
 
 type OcrEngine = "paddle" | "dehtr" | "tesseract";
 type EvidenceScope = "note" | "line";
+type OcrWordChecker = (word: string) => boolean;
+type TextBandReader = (id: string, crops: ReturnType<typeof prepareNoteCrops>) => ReturnType<typeof detectTextLineBands>;
 
 export type NoteOcrResult = {
   id: string;
@@ -361,8 +363,13 @@ async function getPaddleRunner(report: (progress: number, label: string) => void
 
 function paddleBatchSize() {
   const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+  return deviceMemory >= 6 && navigator.hardwareConcurrency >= 6 ? 2 : 1;
+}
+
+function supportsParallelOcrReaders() {
   const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  return coarsePointer || deviceMemory <= 4 || navigator.hardwareConcurrency <= 4 ? 1 : 2;
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? (coarsePointer ? 4 : 8);
+  return deviceMemory >= 6 && navigator.hardwareConcurrency >= 6;
 }
 
 function yieldToUi() {
@@ -393,10 +400,12 @@ async function recognizeWithPaddle(
   report: (progress: number, label: string) => void,
   recordEvidence: (id: string, candidate: OcrCandidate | null) => void,
   recordSymbols: (id: string, crops: ReturnType<typeof prepareNoteCrops>) => void,
+  getTextBands: TextBandReader,
+  wordCheckerPromise: Promise<OcrWordChecker>,
+  onBatchComplete?: (notes: NoteRegion[], candidates: ReadonlyMap<string, OcrCandidate>) => void,
 ) {
-  const runner = await getPaddleRunner(report);
+  const [runner, isKnownWord] = await Promise.all([getPaddleRunner(report), wordCheckerPromise]);
   const candidates = new Map<string, OcrCandidate>();
-  const isKnownWord = await getOcrWordChecker().catch(() => () => false);
   const batchSize = paddleBatchSize();
   let successfulBatches = 0;
   let failedBatches = 0;
@@ -455,7 +464,7 @@ async function recognizeWithPaddle(
 
       const lineJobs: Array<{ note: NoteRegion; order: number; canvas: HTMLCanvasElement }> = [];
       weak.filter(needsMoreEvidence).forEach((entry) => {
-        const bands = detectTextLineBands(entry.crops.sauvola);
+        const bands = getTextBands(entry.note.id, entry.crops);
         if (bands.length) {
           bands.forEach((band) => {
             const canvas = createTextLineCrop(entry.crops.contrast, band);
@@ -510,6 +519,10 @@ async function recognizeWithPaddle(
       }
       const completed = Math.min(notes.length, start + batch.length);
       report(84, `${completed} von ${notes.length} Notizen mit Bildfiltern gelesen`);
+      onBatchComplete?.(batch, new Map(batch.flatMap((note) => {
+        const candidate = candidates.get(note.id);
+        return candidate ? [[note.id, candidate] as const] : [];
+      })));
     } catch (error) {
       failedBatches += 1;
       firstFailure ??= error instanceof Error ? error : new Error(String(error));
@@ -536,9 +549,11 @@ async function recognizeWithDehtr(
   report: (progress: number, label: string) => void,
   recordEvidence: (id: string, candidate: OcrCandidate | null) => void,
   recordSymbols: (id: string, crops: ReturnType<typeof prepareNoteCrops>) => void,
+  getTextBands: TextBandReader,
+  wordCheckerPromise: Promise<OcrWordChecker>,
 ) {
   const startedAt = performance.now();
-  const isKnownWord = await getOcrWordChecker().catch(() => () => false);
+  const isKnownWord = await wordCheckerPromise;
   const orderedNotes = notes.filter((note) => {
     const current = existing.get(note.id);
     return !current || (current.stability ?? 0) < 0.7 || lexicalPlausibility(current, isKnownWord) < 0.55
@@ -566,7 +581,7 @@ async function recognizeWithDehtr(
     recordSymbols(note.id, prepared);
     const lineCanvases: HTMLCanvasElement[] = [];
     try {
-      const bands = detectTextLineBands(prepared.sauvola);
+      const bands = getTextBands(note.id, prepared);
       if (!bands.length) continue;
       const lines: Array<{ order: number; candidate: OcrCandidate }> = [];
       for (let lineIndex = 0; lineIndex < bands.length; lineIndex += 1) {
@@ -647,6 +662,8 @@ async function recognizeWithTesseract(
   report: (progress: number, label: string) => void,
   recordEvidence: (id: string, candidate: OcrCandidate | null) => void,
   recordSymbols: (id: string, crops: ReturnType<typeof prepareNoteCrops>) => void,
+  getTextBands: TextBandReader,
+  wordCheckerPromise: Promise<OcrWordChecker>,
 ) {
   const startedAt = performance.now();
   const deviceMemory = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8);
@@ -656,7 +673,7 @@ async function recognizeWithTesseract(
   let skippedCount = Math.max(0, notes.length - fallbackNotes.length);
   if (!fallbackNotes.length) return { attempts: 0, candidateCount: 0, failureCount: 0, skippedCount, elapsedMs: 0 };
 
-  const isKnownWord = await getOcrWordChecker().catch(() => () => false);
+  const isKnownWord = await wordCheckerPromise;
   report(95, `Fallback wird für ${fallbackNotes.length} besonders schwierige Notiz${fallbackNotes.length === 1 ? "" : "en"} vorbereitet`);
   const { createWorker, OEM, PSM } = await import("tesseract.js");
   let active = 0;
@@ -731,7 +748,7 @@ async function recognizeWithTesseract(
         recordEvidence(note.id, best);
 
         const current = existing.get(note.id) ?? null;
-        const firstBands = detectTextLineBands(prepared.sauvola);
+        const firstBands = getTextBands(note.id, prepared);
         const firstContext = visualContextFromBands(firstBands);
         const needsSecondPass = !best || best.confidence < 62 || assessOcrText(best, { isKnown: isKnownWord }, firstContext) < 0.62
           || Boolean(current && similarity(current.text, best.text) < 0.48);
@@ -753,7 +770,7 @@ async function recognizeWithTesseract(
             ? { text: cleanText(second.data.text), confidence: Math.round(second.data.confidence || 0), engine: "tesseract", variant: "tesseract-sparse-sauvola", scope: "note" }
             : null;
           recordEvidence(note.id, alternative);
-          const bands = detectTextLineBands(prepared.sauvola);
+          const bands = getTextBands(note.id, prepared);
           best = fuseOcrLines(
             [best, alternative].filter((candidate): candidate is OcrCandidate => Boolean(candidate)),
             isKnownWord,
@@ -764,7 +781,7 @@ async function recognizeWithTesseract(
           if (current) existing.set(note.id, current);
           continue;
         }
-        const bands = detectTextLineBands(prepared.sauvola);
+        const bands = getTextBands(note.id, prepared);
         const context = visualContextFromBands(bands);
         let selected = current;
         if (!current) selected = best;
@@ -813,6 +830,7 @@ export async function recognizeNoteTexts(
   const candidates = new Map<string, OcrCandidate>();
   const evidenceById = new Map<string, OcrEvidence[]>();
   const symbolsById = new Map<string, RecognizedSymbol[]>();
+  const textBandsById = new Map<string, ReturnType<typeof detectTextLineBands>>();
   const emptyDiagnostics = (): OcrEngineDiagnostics => ({ status: "skipped", attempts: 0, candidateCount: 0, elapsedMs: 0 });
   const diagnostics: OcrRunDiagnostics = {
     paddle: emptyDiagnostics(),
@@ -842,10 +860,80 @@ export async function recognizeNoteTexts(
       console.warn(`Symbolerkennung für ${id} fehlgeschlagen`, error);
     }
   };
+  const getTextBands: TextBandReader = (id, crops) => {
+    const cached = textBandsById.get(id);
+    if (cached) return cached;
+    const bands = detectTextLineBands(crops.sauvola);
+    textBandsById.set(id, bands);
+    return bands;
+  };
+  const wordCheckerPromise = getOcrWordChecker().catch((): OcrWordChecker => () => false);
+  const parallelReaders = supportsParallelOcrReaders();
+  let paddleIsRunning = true;
+  let paddleProgress = 41;
+  const scheduledDehtrIds = new Set<string>();
+  const dehtrJobs: Promise<void>[] = [];
+  let dehtrTail: Promise<void> = Promise.resolve();
+  const dehtrSummary = { attempts: 0, candidateCount: 0, failureCount: 0, elapsedMs: 0, error: undefined as string | undefined };
+  const dehtrReport = (progress: number, label: string) => {
+    if (paddleIsRunning) report(paddleProgress, `Parallel · ${label}`);
+    else report(progress, label);
+  };
+  const scheduleDehtr = (incoming: NoteRegion[]) => {
+    const unscheduled = incoming.filter((note) => !scheduledDehtrIds.has(note.id));
+    if (!unscheduled.length) return;
+    unscheduled.forEach((note) => scheduledDehtrIds.add(note.id));
+    const job = dehtrTail.then(async () => {
+      try {
+        const result = await recognizeWithDehtr(
+          image,
+          unscheduled,
+          candidates,
+          dehtrReport,
+          recordEvidence,
+          recordSymbols,
+          getTextBands,
+          wordCheckerPromise,
+        );
+        dehtrSummary.attempts += result.attempts;
+        dehtrSummary.candidateCount += result.candidateCount;
+        dehtrSummary.failureCount += result.failureCount;
+        dehtrSummary.elapsedMs += result.elapsedMs;
+        dehtrSummary.error ??= result.error;
+      } catch (error) {
+        dehtrSummary.failureCount += 1;
+        dehtrSummary.error ??= errorMessage(error);
+        console.warn("Das zweite Handschriftmodell ist nicht verfügbar.", error);
+      }
+    });
+    dehtrTail = job;
+    dehtrJobs.push(job);
+  };
+  if (parallelReaders) {
+    void preloadDehtrModel().catch((error) => console.warn("DE·HTR konnte nicht vorgewärmt werden.", error));
+  }
   const paddleStartedAt = performance.now();
   try {
-    const paddle = await recognizeWithPaddle(image, notes, report, recordEvidence, recordSymbols);
-    paddle.candidates.forEach((candidate, id) => { candidates.set(id, candidate); recordEvidence(id, candidate); });
+    const paddle = await recognizeWithPaddle(
+      image,
+      notes,
+      (progress, label) => {
+        paddleProgress = progress;
+        report(progress, label);
+      },
+      recordEvidence,
+      recordSymbols,
+      getTextBands,
+      wordCheckerPromise,
+      parallelReaders ? (completedNotes, completedCandidates) => {
+        completedCandidates.forEach((candidate, id) => candidates.set(id, candidate));
+        scheduleDehtr(completedNotes);
+      } : undefined,
+    );
+    paddle.candidates.forEach((candidate, id) => {
+      if (!parallelReaders || !candidates.has(id)) candidates.set(id, candidate);
+      recordEvidence(id, candidate);
+    });
     diagnostics.paddle = {
       status: paddle.failureCount ? "partial" : "ready",
       attempts: notes.length,
@@ -862,26 +950,37 @@ export async function recognizeNoteTexts(
       error: errorMessage(error),
     };
     console.warn("PaddleOCR ist nicht verfügbar; die Ersatzmodelle übernehmen.", error);
+  } finally {
+    paddleIsRunning = false;
   }
 
-  try {
-    const dehtr = await recognizeWithDehtr(image, notes, candidates, report, recordEvidence, recordSymbols);
+  if (parallelReaders) {
+    scheduleDehtr(notes.filter((note) => !scheduledDehtrIds.has(note.id)));
+    await Promise.all(dehtrJobs);
     diagnostics.dehtr = {
-      status: dehtr.failureCount ? "partial" : dehtr.attempts ? "ready" : "skipped",
-      ...dehtr,
+      status: dehtrSummary.failureCount ? dehtrSummary.candidateCount ? "partial" : "failed" : dehtrSummary.attempts ? "ready" : "skipped",
+      ...dehtrSummary,
     };
-  } catch (error) {
-    diagnostics.dehtr = {
-      status: "failed",
-      attempts: 1,
-      candidateCount: 0,
-      elapsedMs: 0,
-      error: errorMessage(error),
-    };
-    console.warn("Das zweite Handschriftmodell ist nicht verfügbar.", error);
+  } else {
+    try {
+      const dehtr = await recognizeWithDehtr(image, notes, candidates, report, recordEvidence, recordSymbols, getTextBands, wordCheckerPromise);
+      diagnostics.dehtr = {
+        status: dehtr.failureCount ? "partial" : dehtr.attempts ? "ready" : "skipped",
+        ...dehtr,
+      };
+    } catch (error) {
+      diagnostics.dehtr = {
+        status: "failed",
+        attempts: 1,
+        candidateCount: 0,
+        elapsedMs: 0,
+        error: errorMessage(error),
+      };
+      console.warn("Das zweite Handschriftmodell ist nicht verfügbar.", error);
+    }
   }
 
-  const fallbackIsKnown = await getOcrWordChecker().catch(() => () => false);
+  const fallbackIsKnown = await wordCheckerPromise;
   const fallbackUrgency = (note: NoteRegion) => {
     const candidate = candidates.get(note.id);
     if (!candidate?.text.trim()) return 10_000;
@@ -895,7 +994,7 @@ export async function recognizeNoteTexts(
   }).sort((left, right) => fallbackUrgency(right) - fallbackUrgency(left));
   if (tesseractNotes.length) {
     try {
-      const tesseract = await recognizeWithTesseract(image, tesseractNotes, candidates, report, recordEvidence, recordSymbols);
+      const tesseract = await recognizeWithTesseract(image, tesseractNotes, candidates, report, recordEvidence, recordSymbols, getTextBands, wordCheckerPromise);
       diagnostics.tesseract = { status: tesseract.failureCount || tesseract.skippedCount ? "partial" : "ready", ...tesseract };
     } catch (error) {
       diagnostics.tesseract = {

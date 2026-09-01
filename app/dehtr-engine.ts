@@ -19,6 +19,7 @@ type WorkerResponse = ({ type: "result"; id: number } & DehtrResult) | { type: "
 let worker: Worker | null = null;
 let nextJobId = 1;
 let queue: Promise<unknown> = Promise.resolve();
+let warmupPromise: Promise<void> | null = null;
 const pending = new Map<number, PendingJob>();
 
 function resetWorker(reason: Error) {
@@ -99,4 +100,24 @@ export function recognizeHandwrittenLine(canvas: HTMLCanvasElement) {
   const task = queue.then(() => recognizeNow(canvas));
   queue = task.catch(() => undefined);
   return task;
+}
+
+export function preloadDehtrModel() {
+  if (!warmupPromise) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+    if (!context) return Promise.resolve();
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    warmupPromise = recognizeHandwrittenLine(canvas)
+      .then(() => undefined)
+      .finally(() => { canvas.width = 1; canvas.height = 1; })
+      .catch((error) => {
+        warmupPromise = null;
+        throw error;
+      });
+  }
+  return warmupPromise;
 }
